@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>植物园游线规划器</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-icon">🌿</span>
+    <div>
+      <h1>植物园游线规划器</h1>
+      <p>Botanical Garden Route Planner</p>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="visitor">🧭 游客导览</button>
+    <button class="tab" data-tab="admin">🛠️ 管理后台</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ 游客导览 ============ -->
+  <section id="tab-visitor" class="tab-panel active">
+    <div class="visitor-grid">
+      <div class="map-card card">
+        <div class="map-toolbar">
+          <span class="hint">💡 点击地图节点可依次设定起点 / 终点</span>
+          <button id="btn-clear" class="btn btn-ghost">清除选择</button>
+        </div>
+        <svg id="map" viewBox="0 0 1000 800" role="img" aria-label="园区地图"></svg>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="panel">
+        <div class="card">
+          <h2>规划我的路线</h2>
+          <div class="form-row">
+            <label>起点</label>
+            <select id="sel-start"></select>
+          </div>
+          <div class="form-row">
+            <label>终点</label>
+            <select id="sel-end"></select>
+          </div>
+          <div class="form-row">
+            <label>游览偏好</label>
+            <div id="mode-cards" class="mode-cards"></div>
+          </div>
+          <div class="form-row" id="row-max-slope" hidden>
+            <label>可接受最大坡度（%）</label>
+            <input type="number" id="inp-max-slope" min="0" max="30" step="1" value="8">
+          </div>
+          <button id="btn-plan" class="btn btn-primary">🧭 开始规划</button>
+        </div>
+
+        <div id="route-result" class="card result-card" hidden>
+          <h2>路线方案 <span id="result-mode" class="badge"></span></h2>
+          <div id="result-summary" class="summary"></div>
+          <div id="result-tips" class="tips"></div>
+          <ol id="result-segments" class="segments"></ol>
+        </div>
+        <div id="route-error" class="card error-card" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 管理后台 ============ -->
+  <section id="tab-admin" class="tab-panel">
+    <div class="card admin-token-card">
+      <h2>管理员口令</h2>
+      <div class="token-row">
+        <input type="password" id="inp-token" placeholder="请输入管理口令（默认 admin123）">
+        <button id="btn-save-token" class="btn btn-primary">保存口令</button>
+        <span id="token-status" class="hint"></span>
+      </div>
+    </div>
+
+    <div class="admin-grid">
+      <div class="card">
+        <h2>节点管理 <span class="hint">温室 / 花境 / 湖边栈道 / 休息点</span></h2>
+        <form id="form-node" class="admin-form">
+          <input type="hidden" id="node-id">
+          <div class="grid-2">
+            <div class="form-row"><label>名称 *</label><input id="node-name" required placeholder="如：热带温室"></div>
+            <div class="form-row"><label>类型 *</label>
+              <select id="node-type">
+                <option value="GREENHOUSE">🏛️ 温室</option>
+                <option value="FLOWER_BORDER">🌸 花境</option>
+                <option value="LAKESIDE_WALK">🌊 湖边栈道</option>
+                <option value="REST_AREA">🪑 休息点</option>
+              </select>
+            </div>
+            <div class="form-row"><label>地图 X（0-1000）</label><input id="node-x" type="number" min="0" max="1000" value="500"></div>
+            <div class="form-row"><label>地图 Y（0-800）</label><input id="node-y" type="number" min="0" max="800" value="400"></div>
+          </div>
+          <div class="form-row"><label>简介</label><input id="node-desc" placeholder="一句话介绍"></div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="btn-node-submit">＋ 新增节点</button>
+            <button type="button" class="btn btn-ghost" id="btn-node-cancel" hidden>取消编辑</button>
+          </div>
+        </form>
+        <table class="table" id="table-nodes">
+          <thead><tr><th>名称</th><th>类型</th><th>简介</th><th>操作</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>路段管理 <span class="hint">距离 / 坡度 / 推车适用</span></h2>
+        <form id="form-edge" class="admin-form">
+          <input type="hidden" id="edge-id">
+          <div class="grid-2">
+            <div class="form-row"><label>节点 A *</label><select id="edge-from"></select></div>
+            <div class="form-row"><label>节点 B *</label><select id="edge-to"></select></div>
+            <div class="form-row"><label>步行距离（米）*</label><input id="edge-dist" type="number" min="1" step="1" required placeholder="如：200"></div>
+            <div class="form-row"><label>坡度（%）</label><input id="edge-slope" type="number" min="0" max="30" step="0.5" value="0"></div>
+            <div class="form-row"><label>路段名</label><input id="edge-name" placeholder="如：湖畔引道"></div>
+            <div class="form-row checkbox-row"><label><input type="checkbox" id="edge-stroller" checked> 适合推车通行</label></div>
+          </div>
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary" id="btn-edge-submit">＋ 新增路段</button>
+            <button type="button" class="btn btn-ghost" id="btn-edge-cancel" hidden>取消编辑</button>
+          </div>
+        </form>
+        <table class="table" id="table-edges">
+          <thead><tr><th>路段</th><th>距离</th><th>坡度</th><th>推车</th><th>操作</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

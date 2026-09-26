@@ -23,3 +23,7 @@ __pycache__/
 *.log
 .env
 .env.*
+
+# 运行时生成的园区数据（示例数据在 DataStore.java 中）
+data/garden.json
+data/garden.json.tmp
