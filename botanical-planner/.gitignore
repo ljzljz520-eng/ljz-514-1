@@ -1,0 +1,10 @@
+# 编译输出
+out/
+sources.txt
+
+# 运行时文件
+*.log
+server.pid
+
+# 园区数据由默认示例自动生成（管理员运行时修改后持久化于此）
+data/garden.json

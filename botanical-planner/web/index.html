@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>植物园游线规划器</title>
+<style>
+  :root {
+    --green: #2e7d32;
+    --green-dark: #1b5e20;
+    --green-light: #e8f5e9;
+    --accent: #ef6c00;
+    --blue: #1565c0;
+    --bg: #f4f7f2;
+    --card: #ffffff;
+    --border: #d7e0d4;
+    --text: #263326;
+    --muted: #6b7a68;
+    --danger: #c62828;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: linear-gradient(135deg, var(--green-dark), var(--green));
+    color: #fff;
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header .logo { font-size: 30px; }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+  header p { margin: 2px 0 0; font-size: 13px; opacity: .85; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--card);
+    padding: 0 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 14px 22px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 15px;
+    color: var(--muted);
+    border-bottom: 3px solid transparent;
+    font-weight: 600;
+  }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); }
+  .tab:hover { color: var(--green-dark); }
+
+  main { max-width: 1240px; margin: 22px auto; padding: 0 20px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .card h2 { margin: 0 0 14px; font-size: 16px; color: var(--green-dark); }
+  .card h3 { margin: 16px 0 8px; font-size: 14px; color: var(--green-dark); }
+
+  label.field { display: block; margin-bottom: 12px; font-size: 13px; font-weight: 600; color: #42503f; }
+  select, input[type=text], input[type=number], input[type=password], textarea {
+    width: 100%;
+    margin-top: 5px;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+  }
+  select:focus, input:focus, textarea:focus { outline: 2px solid #a5d6a7; border-color: var(--green); }
+
+  .prefs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 5px; }
+  .pref-opt {
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    padding: 9px 8px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    background: #fafdf9;
+    user-select: none;
+  }
+  .pref-opt.selected { border-color: var(--green); background: var(--green-light); color: var(--green-dark); }
+  .pref-opt .ico { display: block; font-size: 18px; margin-bottom: 2px; }
+
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  .checkbox-row input { width: 16px; height: 16px; accent-color: var(--green); }
+
+  button.primary {
+    width: 100%;
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button.primary:hover { background: var(--green-dark); }
+  button.ghost {
+    padding: 6px 12px; border: 1px solid var(--border); background: #fff;
+    border-radius: 7px; cursor: pointer; font-size: 13px; color: var(--text);
+  }
+  button.ghost:hover { border-color: var(--green); color: var(--green); }
+  button.danger { color: var(--danger); }
+  button.danger:hover { border-color: var(--danger); }
+
+  .map-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+  svg#map { width: 100%; height: auto; display: block; border-radius: 8px; background: #f0f5ee; }
+  .map-edge { stroke: #b4c4af; stroke-width: 4; fill: none; }
+  .map-edge.nostroller { stroke: #d7a3a3; stroke-dasharray: 7 5; }
+  .map-edge.route { stroke: var(--accent); stroke-width: 6; stroke-linecap: round; }
+  .map-edge-label { font-size: 11px; fill: #5d6b5a; text-anchor: middle; }
+  .map-node circle { stroke: #fff; stroke-width: 2.5; cursor: pointer; }
+  .map-node text { font-size: 12px; fill: #263326; text-anchor: middle; font-weight: 600; pointer-events: none;
+    paint-order: stroke; stroke: #f0f5ee; stroke-width: 3px; }
+  .map-node.route-node circle { stroke: var(--accent); stroke-width: 3.5; }
+  .map-node.start-node circle, .map-node.goal-node circle { stroke: var(--blue); stroke-width: 4; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; padding: 0 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .line-swatch { width: 22px; height: 0; border-top: 4px solid #b4c4af; display: inline-block; }
+  .line-swatch.dash { border-top: 4px dashed #d7a3a3; }
+  .line-swatch.route { border-top: 6px solid var(--accent); }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .stats { grid-template-columns: repeat(2,1fr); } }
+  .stat { background: var(--green-light); border-radius: 10px; padding: 12px; text-align: center; }
+  .stat .v { font-size: 22px; font-weight: 800; color: var(--green-dark); }
+  .stat .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .warnings { background: #fff8e1; border: 1px solid #ffe082; border-radius: 9px; padding: 10px 14px; margin-bottom: 12px; }
+  .warnings ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: #8d6e00; }
+  .ok-banner { background: var(--green-light); border: 1px solid #a5d6a7; border-radius: 9px; padding: 10px 14px; font-size: 13px; color: var(--green-dark); margin-bottom: 12px; }
+  .error-banner { background: #ffebee; border: 1px solid #ef9a9a; border-radius: 9px; padding: 10px 14px; font-size: 13px; color: var(--danger); margin-bottom: 12px; }
+
+  ol.segments { list-style: none; counter-reset: seg; padding: 0; margin: 0; }
+  ol.segments li {
+    counter-increment: seg;
+    position: relative;
+    padding: 12px 12px 12px 46px;
+    border-left: 3px solid var(--green);
+    margin-left: 14px;
+    font-size: 13.5px;
+    line-height: 1.65;
+  }
+  ol.segments li::before {
+    content: counter(seg);
+    position: absolute; left: -15px; top: 12px;
+    width: 28px; height: 28px;
+    background: var(--green); color: #fff;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .seg-meta { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; margin-right: 5px; font-weight: 600; }
+  .tag.up { background: #ffe0b2; color: #e65100; }
+  .tag.down { background: #bbdefb; color: #0d47a1; }
+  .tag.flat { background: #e0e0e0; color: #555; }
+  .tag.no-stroller { background: #ffcdd2; color: #b71c1c; }
+  .tag.scenic { background: #f8bbd0; color: #880e4f; }
+
+  /* 管理页 */
+  .admin-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 1100px) { .admin-layout { grid-template-columns: 1fr; } }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 700; }
+  td .mini { font-size: 11px; color: var(--muted); }
+  .table-scroll { max-height: 420px; overflow-y: auto; }
+
+  .modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4);
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-bg.show { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 22px; width: 440px; max-width: 92vw; max-height: 90vh; overflow-y: auto; }
+  .modal h2 { margin: 0 0 16px; font-size: 17px; color: var(--green-dark); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #324232; color: #fff; padding: 10px 22px; border-radius: 24px;
+    font-size: 13.5px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 200;
+  }
+  .toast.show { opacity: .95; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">🌿</div>
+  <div>
+    <h1>植物园游线规划器</h1>
+    <p>选择起点、终点与游览偏好，为您推荐最合适的园区步行路线</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-page="tour">🗺️ 游客规划</button>
+  <button class="tab" data-page="admin">⚙️ 园区管理</button>
+</div>
+
+<main>
+  <!-- ============ 游客页 ============ -->
+  <section id="page-tour" class="page active">
+    <div class="layout">
+      <div>
+        <div class="card">
+          <h2>🧭 路线条件</h2>
+          <label class="field">起点
+            <select id="startSelect"></select>
+          </label>
+          <label class="field">终点
+            <select id="goalSelect"></select>
+          </label>
+          <label class="field" style="margin-bottom:6px">游览偏好</label>
+          <div class="prefs" id="prefBox">
+            <div class="pref-opt selected" data-pref="shortest"><span class="ico">📏</span>距离最短</div>
+            <div class="pref-opt" data-pref="leastSlope"><span class="ico">🐢</span>坡度最缓</div>
+            <div class="pref-opt" data-pref="stroller"><span class="ico">🍼</span>推车友好</div>
+            <div class="pref-opt" data-pref="scenic"><span class="ico">🌸</span>观景最佳</div>
+          </div>
+          <label class="checkbox-row">
+            <input type="checkbox" id="withStroller">
+            我携带婴儿车 / 轮椅（只走推车友好步道）
+          </label>
+          <button class="primary" id="planBtn">开始规划路线</button>
+          <p class="hint">“推车友好”偏好会避开陡坡与台阶栈道；勾选携带推车后，所有偏好都只走推车友好路线。</p>
+        </div>
+
+        <div class="card" id="summaryCard" style="display:none">
+          <h2>📋 规划结果</h2>
+          <div id="resultBanners"></div>
+          <div class="stats" id="stats"></div>
+          <ol class="segments" id="segments"></ol>
+        </div>
+      </div>
+
+      <div>
+        <div class="map-wrap">
+          <svg id="map" viewBox="0 0 1000 950" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="legend">
+            <span><i class="swatch" style="background:#6d4c41"></i>入口</span>
+            <span><i class="swatch" style="background:#8e24aa"></i>温室</span>
+            <span><i class="swatch" style="background:#e91e63"></i>花境</span>
+            <span><i class="swatch" style="background:#00897b"></i>栈道</span>
+            <span><i class="swatch" style="background:#f9a825"></i>休息点</span>
+            <span><i class="line-swatch"></i>步道</span>
+            <span><i class="line-swatch dash"></i>不可推车</span>
+            <span><i class="line-swatch route"></i>推荐路线</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 管理页 ============ -->
+  <section id="page-admin" class="page">
+    <div class="card">
+      <h2>🔐 管理员登录</h2>
+      <div style="display:flex;gap:10px;max-width:520px">
+        <input type="password" id="adminToken" placeholder="请输入管理口令（默认 garden-admin）" style="flex:1">
+        <button class="ghost" id="saveTokenBtn" style="white-space:nowrap">保存口令</button>
+        <button class="ghost danger" id="resetBtn">恢复默认园区</button>
+      </div>
+      <p class="hint">口令保存在本浏览器 localStorage 中，仅用于调用管理接口（请求头 X-Admin-Token）。</p>
+    </div>
+
+    <div class="admin-layout">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2>📍 节点管理 <span class="hint" id="nodeCount"></span></h2>
+          <button class="ghost" id="addNodeBtn">＋ 新增节点</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>ID</th><th>名称</th><th>类型</th><th>坐标</th><th style="width:96px">操作</th></tr></thead>
+            <tbody id="nodeTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h2>🛤️ 步道管理 <span class="hint" id="edgeCount"></span></h2>
+          <button class="ghost" id="addEdgeBtn">＋ 新增步道</button>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>ID</th><th>端点</th><th>距离</th><th>坡度</th><th>推车</th><th>景观</th><th style="width:96px">操作</th></tr></thead>
+            <tbody id="edgeTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- 节点编辑弹窗 -->
+<div class="modal-bg" id="nodeModal">
+  <div class="modal">
+    <h2 id="nodeModalTitle">新增节点</h2>
+    <input type="hidden" id="n_origId">
+    <div class="two-col">
+      <label class="field">ID（英文）<input type="text" id="n_id" placeholder="如 gh3"></label>
+      <label class="field">类型
+        <select id="n_type">
+          <option value="entrance">入口/出口</option>
+          <option value="greenhouse">温室</option>
+          <option value="border">花境</option>
+          <option value="boardwalk">湖边栈道</option>
+          <option value="rest">休息点</option>
+        </select>
+      </label>
+    </div>
+    <label class="field">名称<input type="text" id="n_name" placeholder="如 沙漠植物温室"></label>
+    <label class="field">简介<textarea id="n_desc" rows="2" placeholder="一句话介绍（可选）"></textarea></label>
+    <div class="two-col">
+      <label class="field">X 坐标 (0-1000)<input type="number" id="n_x" min="0" max="1000" value="150"></label>
+      <label class="field">Y 坐标 (0-1000)<input type="number" id="n_y" min="0" max="1000" value="150"></label>
+    </div>
+    <p class="hint">提示：X 向右增大，Y 向下增大。可先在地图上目测位置后填写。</p>
+    <div class="modal-actions">
+      <button class="ghost" data-close="nodeModal">取消</button>
+      <button class="primary" id="saveNodeBtn" style="margin:0">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 步道编辑弹窗 -->
+<div class="modal-bg" id="edgeModal">
+  <div class="modal">
+    <h2 id="edgeModalTitle">新增步道</h2>
+    <input type="hidden" id="e_origId">
+    <div class="two-col">
+      <label class="field">ID（英文）<input type="text" id="e_id" placeholder="如 w21"></label>
+      <label class="field">步行距离（米）<input type="number" id="e_dist" min="1" max="5000" value="150"></label>
+    </div>
+    <div class="two-col">
+      <label class="field">端点 A<select id="e_from"></select></label>
+      <label class="field">端点 B<select id="e_to"></select></label>
+    </div>
+    <div class="two-col">
+      <label class="field">平均坡度（%，上坡正/下坡负）<input type="number" id="e_slope" step="0.5" min="-40" max="40" value="0"></label>
+      <label class="field">景观评分（0-10）<input type="number" id="e_scenic" min="0" max="10" value="5"></label>
+    </div>
+    <label class="checkbox-row"><input type="checkbox" id="e_stroller"> 适合推车通行（无陡坡、无台阶）</label>
+    <div class="modal-actions">
+      <button class="ghost" data-close="edgeModal">取消</button>
+      <button class="primary" id="saveEdgeBtn" style="margin:0">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+const TYPE_COLOR = {
+  entrance: '#6d4c41',
+  greenhouse: '#8e24aa',
+  border: '#e91e63',
+  boardwalk: '#00897b',
+  rest: '#f9a825'
+};
+const TYPE_LABEL = {
+  entrance: '入口', greenhouse: '温室', border: '花境', boardwalk: '栈道', rest: '休息点'
+};
+
+const state = {
+  nodes: [],
+  edges: [],
+  preference: 'shortest',
+  route: null
+};
+
+// ---------------- 通用请求 ----------------
+async function api(path, opts = {}) {
+  const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  const res = await fetch(path, Object.assign({}, opts, { headers }));
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) { data = { error: text }; }
+  if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+  return data;
+}
+
+function adminHeaders() {
+  const t = localStorage.getItem('adminToken') || '';
+  return { 'X-Admin-Token': t };
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+function nodeById(id) { return state.nodes.find(n => n.id === id); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---------------- 标签页 ----------------
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('page-' + btn.dataset.page).classList.add('active');
+    renderMap();
+  });
+});
+
+// ---------------- 偏好选择 ----------------
+document.querySelectorAll('.pref-opt').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.pref-opt').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+    state.preference = el.dataset.pref;
+  });
+});
+
+// ---------------- 加载数据 ----------------
+async function refreshData() {
+  const [n, e] = await Promise.all([api('/api/nodes'), api('/api/edges')]);
+  state.nodes = n.nodes;
+  state.edges = e.edges;
+  renderSelectors();
+  renderMap();
+  renderAdminTables();
+}
+
+function renderSelectors() {
+  const opts = state.nodes.map(n =>
+    `<option value="${esc(n.id)}">${esc(n.name)}（${TYPE_LABEL[n.type]}）</option>`).join('');
+  const s = document.getElementById('startSelect');
+  const g = document.getElementById('goalSelect');
+  const prevS = s.value, prevG = g.value;
+  s.innerHTML = opts;
+  g.innerHTML = opts;
+  if (state.nodes.length >= 2) {
+    s.value = prevS || state.nodes[0].id;
+    g.value = prevG || state.nodes[state.nodes.length - 1].id;
+  }
+}
+
+// ---------------- 地图渲染 ----------------
+function renderMap() {
+  const svg = document.getElementById('map');
+  const routeEdgeIds = new Set();
+  const routeNodeIds = new Set();
+  if (state.route && state.route.found) {
+    state.route.segments.forEach(seg => routeEdgeIds.add(seg.edgeId));
+    state.route.nodeIds.forEach(id => routeNodeIds.add(id));
+  }
+  const startId = document.getElementById('startSelect').value;
+  const goalId = document.getElementById('goalSelect').value;
+
+  let html = '';
+
+  // 水面装饰（湖）
+  html += `<ellipse cx="690" cy="180" rx="240" ry="120" fill="#d6ecf5" opacity="0.8"/>`;
+  html += `<text x="690" y="120" text-anchor="middle" font-size="15" fill="#7fa8bd" font-style="italic">栖 鹤 湖</text>`;
+  html += `<ellipse cx="760" cy="760" rx="120" ry="70" fill="#d6ecf5" opacity="0.7"/>`;
+
+  // 步道
+  state.edges.forEach(e => {
+    const a = nodeById(e.from), b = nodeById(e.to);
+    if (!a || !b) return;
+    const cls = ['map-edge'];
+    if (!e.strollerFriendly) cls.push('nostroller');
+    if (routeEdgeIds.has(e.id)) cls.push('route');
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    html += `<line class="${cls.join(' ')}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+    if (!routeEdgeIds.has(e.id)) {
+      html += `<text class="map-edge-label" x="${mx}" y="${my - 4}">${e.distanceMeters}m</text>`;
+    }
+  });
+
+  // 节点
+  state.nodes.forEach(n => {
+    const cls = ['map-node'];
+    if (routeNodeIds.has(n.id)) cls.push('route-node');
+    if (n.id === startId) cls.push('start-node');
+    if (n.id === goalId) cls.push('goal-node');
+    const r = n.type === 'entrance' ? 12 : 9;
+    const labelDy = n.y > 800 ? -16 : 22;
+    html += `<g class="${cls.join(' ')}" data-id="${esc(n.id)}">
+      <circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${TYPE_COLOR[n.type]}">
+        <title>${esc(n.name)}｜${TYPE_LABEL[n.type]}${n.description ? '\n' + esc(n.description) : ''}</title>
+      </circle>
+      <text x="${n.x}" y="${n.y + labelDy}">${esc(n.name)}</text>
+    </g>`;
+  });
+
+  svg.innerHTML = html;
+
+  // 点击地图上的节点：游客页快速选择，奇数次点选设为起点、偶数次设为终点
+  svg.querySelectorAll('.map-node').forEach(g => {
+    g.addEventListener('click', () => {
+      if (!document.getElementById('page-tour').classList.contains('active')) return;
+      const id = g.dataset.id;
+      const s = document.getElementById('startSelect');
+      const gg = document.getElementById('goalSelect');
+      state._pickGoal = !state._pickGoal;
+      if (state._pickGoal) {
+        s.value = id;
+        toast('已设起点：' + (nodeById(id) || {}).name + '，再点一个节点作为终点');
+      } else {
+        if (id === s.value) { toast('终点不能与起点相同'); state._pickGoal = true; return; }
+        gg.value = id;
+        toast('已设终点：' + (nodeById(id) || {}).name);
+      }
+    });
+  });
+}
+
+// ---------------- 规划 ----------------
+document.getElementById('planBtn').addEventListener('click', async () => {
+  const startId = document.getElementById('startSelect').value;
+  const goalId = document.getElementById('goalSelect').value;
+  const withStroller = document.getElementById('withStroller').checked;
+  if (!startId || !goalId) { toast('请先选择起点和终点'); return; }
+  if (startId === goalId) { toast('起点和终点不能相同'); return; }
+
+  const btn = document.getElementById('planBtn');
+  btn.disabled = true; btn.textContent = '规划中…';
+  try {
+    const result = await api('/api/plan', {
+      method: 'POST',
+      body: JSON.stringify({ startId, goalId, preference: state.preference, withStroller })
+    });
+    state.route = result;
+    renderResult(result);
+    renderMap();
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '开始规划路线';
+  }
+});
+
+function slopeTag(seg) {
+  if (Math.abs(seg.slopePercent) < 0.5) return '<span class="tag flat">平路</span>';
+  if (seg.slopePercent > 0) return `<span class="tag up">上坡 ${fmtSlope(seg.slopePercent)}%</span>`;
+  return `<span class="tag down">下坡 ${fmtSlope(Math.abs(seg.slopePercent))}%</span>`;
+}
+function fmtSlope(v) { return Number.isInteger(v) ? v : v.toFixed(1); }
+
+function renderResult(r) {
+  const card = document.getElementById('summaryCard');
+  card.style.display = 'block';
+  const banners = document.getElementById('resultBanners');
+
+  if (!r.found) {
+    document.getElementById('stats').innerHTML = '';
+    document.getElementById('segments').innerHTML = '';
+    banners.innerHTML = `<div class="error-banner">🚫 ${esc(r.message)}</div>`;
+    return;
+  }
+
+  banners.innerHTML =
+    `<div class="ok-banner">✅ ${esc(r.preferenceLabel)}方案已生成：${esc(r.message)}</div>` +
+    (r.warnings && r.warnings.length
+      ? `<div class="warnings"><strong>温馨提示</strong><ul>${r.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>`
+      : '');
+
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="v">${(r.totalDistanceMeters/1000).toFixed(2)}<small style="font-size:13px"> km</small></div><div class="k">总距离 · ${r.totalDistanceMeters} 米</div></div>
+    <div class="stat"><div class="v">${r.totalMinutes}<small style="font-size:13px"> 分</small></div><div class="k">预计步行</div></div>
+    <div class="stat"><div class="v">${r.climbMeters}<small style="font-size:13px"> m</small></div><div class="k">累计爬升</div></div>
+    <div class="stat"><div class="v">${r.segments.length}<small style="font-size:13px"> 段</small></div><div class="k">分段数量</div></div>`;
+
+  document.getElementById('segments').innerHTML = r.segments.map(seg => `
+    <li>
+      ${esc(seg.instruction)}
+      <span class="seg-meta">
+        ${slopeTag(seg)}
+        ${seg.strollerFriendly ? '' : '<span class="tag no-stroller">不可推车</span>'}
+        ${seg.scenicScore >= 8 ? '<span class="tag scenic">景观绝佳</span>' : ''}
+        方向：${esc(seg.bearing)} ｜ 约 ${seg.minutes} 分钟
+      </span>
+    </li>`).join('');
+}
+
+// ---------------- 管理端 ----------------
+function renderAdminTables() {
+  document.getElementById('nodeCount').textContent = `（共 ${state.nodes.length} 个）`;
+  document.getElementById('edgeCount').textContent = `（共 ${state.edges.length} 条）`;
+
+  document.getElementById('nodeTbody').innerHTML = state.nodes.map(n => `
+    <tr>
+      <td><code>${esc(n.id)}</code></td>
+      <td>${esc(n.name)}<div class="mini">${esc(n.description || '')}</div></td>
+      <td><span class="tag flat">${TYPE_LABEL[n.type]}</span></td>
+      <td class="mini">${n.x}, ${n.y}</td>
+      <td>
+        <button class="ghost" onclick="openNodeModal('${esc(n.id)}')">编辑</button>
+        <button class="ghost danger" onclick="deleteNode('${esc(n.id)}')">删除</button>
+      </td>
+    </tr>`).join('');
+
+  document.getElementById('edgeTbody').innerHTML = state.edges.map(e => {
+    const a = nodeById(e.from), b = nodeById(e.to);
+    return `<tr>
+      <td><code>${esc(e.id)}</code></td>
+      <td>${a ? esc(a.name) : esc(e.from)} ↔ ${b ? esc(b.name) : esc(e.to)}</td>
+      <td>${e.distanceMeters}m</td>
+      <td>${fmtSlope(e.slopePercent)}%</td>
+      <td>${e.strollerFriendly ? '✅' : '❌'}</td>
+      <td>${e.scenicScore}</td>
+      <td>
+        <button class="ghost" onclick="openEdgeModal('${esc(e.id)}')">编辑</button>
+        <button class="ghost danger" onclick="deleteEdge('${esc(e.id)}')">删除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+document.getElementById('saveTokenBtn').addEventListener('click', () => {
+  const v = document.getElementById('adminToken').value.trim();
+  localStorage.setItem('adminToken', v);
+  toast('管理口令已保存');
+});
+
+document.getElementById('resetBtn').addEventListener('click', async () => {
+  if (!confirm('确定恢复为内置默认园区数据吗？当前所有修改将丢失。')) return;
+  try {
+    await api('/api/admin/reset', { method: 'POST', headers: adminHeaders() });
+    state.route = null;
+    await refreshData();
+    document.getElementById('summaryCard').style.display = 'none';
+    toast('已恢复默认园区');
+  } catch (e) { toast(e.message); }
+});
+
+// 弹窗通用关闭
+document.querySelectorAll('[data-close]').forEach(btn => {
+  btn.addEventListener('click', () => document.getElementById(btn.dataset.close).classList.remove('show'));
+});
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('show'); });
+});
+
+// ---- 节点弹窗 ----
+document.getElementById('addNodeBtn').addEventListener('click', () => openNodeModal(null));
+
+window.openNodeModal = function(id) {
+  const modal = document.getElementById('nodeModal');
+  const sel = document.getElementById('n_type');
+  if (id) {
+    const n = nodeById(id);
+    document.getElementById('nodeModalTitle').textContent = '编辑节点：' + n.name;
+    document.getElementById('n_origId').value = n.id;
+    document.getElementById('n_id').value = n.id;
+    document.getElementById('n_id').disabled = true;
+    document.getElementById('n_name').value = n.name;
+    sel.value = n.type;
+    document.getElementById('n_x').value = n.x;
+    document.getElementById('n_y').value = n.y;
+    document.getElementById('n_desc').value = n.description || '';
+  } else {
+    document.getElementById('nodeModalTitle').textContent = '新增节点';
+    document.getElementById('n_origId').value = '';
+    document.getElementById('n_id').disabled = false;
+    document.getElementById('n_id').value = '';
+    document.getElementById('n_name').value = '';
+    sel.value = 'rest';
+    document.getElementById('n_x').value = 200;
+    document.getElementById('n_y').value = 200;
+    document.getElementById('n_desc').value = '';
+  }
+  modal.classList.add('show');
+};
+
+document.getElementById('saveNodeBtn').addEventListener('click', async () => {
+  const origId = document.getElementById('n_origId').value;
+  const body = {
+    id: document.getElementById('n_id').value.trim(),
+    name: document.getElementById('n_name').value.trim(),
+    type: document.getElementById('n_type').value,
+    x: parseInt(document.getElementById('n_x').value, 10),
+    y: parseInt(document.getElementById('n_y').value, 10),
+    description: document.getElementById('n_desc').value.trim()
+  };
+  if (!body.id || !body.name) { toast('ID 和名称必填'); return; }
+  try {
+    if (origId) {
+      await api('/api/nodes/' + encodeURIComponent(origId), { method: 'PUT', headers: adminHeaders(), body: JSON.stringify(body) });
+    } else {
+      await api('/api/nodes', { method: 'POST', headers: adminHeaders(), body: JSON.stringify(body) });
+    }
+    document.getElementById('nodeModal').classList.remove('show');
+    await refreshData();
+    toast('节点已保存');
+  } catch (e) { toast(e.message); }
+});
+
+window.deleteNode = async function(id) {
+  const related = state.edges.filter(e => e.from === id || e.to === id);
+  const msg = related.length
+    ? `删除节点将同时删除相连的 ${related.length} 条步道，确定删除吗？`
+    : '确定删除该节点吗？';
+  if (!confirm(msg)) return;
+  try {
+    await api('/api/nodes/' + encodeURIComponent(id), { method: 'DELETE', headers: adminHeaders() });
+    state.route = null;
+    await refreshData();
+    toast('节点已删除');
+  } catch (e) { toast(e.message); }
+};
+
+// ---- 步道弹窗 ----
+function fillEndpointSelects() {
+  const opts = state.nodes.map(n => `<option value="${esc(n.id)}">${esc(n.name)}</option>`).join('');
+  document.getElementById('e_from').innerHTML = opts;
+  document.getElementById('e_to').innerHTML = opts;
+}
+
+document.getElementById('addEdgeBtn').addEventListener('click', () => openEdgeModal(null));
+
+window.openEdgeModal = function(id) {
+  fillEndpointSelects();
+  const modal = document.getElementById('edgeModal');
+  if (id) {
+    const e = state.edges.find(x => x.id === id);
+    document.getElementById('edgeModalTitle').textContent = '编辑步道：' + e.id;
+    document.getElementById('e_origId').value = e.id;
+    document.getElementById('e_id').value = e.id;
+    document.getElementById('e_id').disabled = true;
+    document.getElementById('e_from').value = e.from;
+    document.getElementById('e_to').value = e.to;
+    document.getElementById('e_dist').value = e.distanceMeters;
+    document.getElementById('e_slope').value = e.slopePercent;
+    document.getElementById('e_scenic').value = e.scenicScore;
+    document.getElementById('e_stroller').checked = e.strollerFriendly;
+  } else {
+    document.getElementById('edgeModalTitle').textContent = '新增步道';
+    document.getElementById('e_origId').value = '';
+    document.getElementById('e_id').disabled = false;
+    document.getElementById('e_id').value = '';
+    document.getElementById('e_dist').value = 150;
+    document.getElementById('e_slope').value = 0;
+    document.getElementById('e_scenic').value = 5;
+    document.getElementById('e_stroller').checked = true;
+  }
+  modal.classList.add('show');
+};
+
+document.getElementById('saveEdgeBtn').addEventListener('click', async () => {
+  const origId = document.getElementById('e_origId').value;
+  const from = document.getElementById('e_from').value;
+  const to = document.getElementById('e_to').value;
+  if (from === to) { toast('两个端点不能相同'); return; }
+  const body = {
+    id: document.getElementById('e_id').value.trim(),
+    from, to,
+    distanceMeters: parseInt(document.getElementById('e_dist').value, 10),
+    slopePercent: parseFloat(document.getElementById('e_slope').value || 0),
+    scenicScore: parseInt(document.getElementById('e_scenic').value, 10),
+    strollerFriendly: document.getElementById('e_stroller').checked
+  };
+  if (!body.id) { toast('步道 ID 必填'); return; }
+  try {
+    if (origId) {
+      await api('/api/edges/' + encodeURIComponent(origId), { method: 'PUT', headers: adminHeaders(), body: JSON.stringify(body) });
+    } else {
+      await api('/api/edges', { method: 'POST', headers: adminHeaders(), body: JSON.stringify(body) });
+    }
+    document.getElementById('edgeModal').classList.remove('show');
+    await refreshData();
+    toast('步道已保存');
+  } catch (e) { toast(e.message); }
+});
+
+window.deleteEdge = async function(id) {
+  if (!confirm('确定删除这条步道吗？')) return;
+  try {
+    await api('/api/edges/' + encodeURIComponent(id), { method: 'DELETE', headers: adminHeaders() });
+    state.route = null;
+    await refreshData();
+    toast('步道已删除');
+  } catch (e) { toast(e.message); }
+};
+
+// ---------------- 启动 ----------------
+document.getElementById('adminToken').value = localStorage.getItem('adminToken') || '';
+refreshData().catch(e => toast('数据加载失败: ' + e.message));
+</script>
+</body>
+</html>
